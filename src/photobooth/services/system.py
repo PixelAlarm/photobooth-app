@@ -12,6 +12,8 @@ from pathlib import Path
 from typing import Literal
 
 from .base import BaseService
+from .sse import sse_service
+from .sse.sse_ import SseEventTranslateableFrontendNotification
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +62,7 @@ class SystemService(BaseService):
         else:
             # no error, service restart ok
             logger.info(f"service {SERVICE_NAME} currently active, restarting")
+            sse_service.dispatch_event(SseEventTranslateableFrontendNotification(color="positive", message_key="system.service_restarted"))
             subprocess.run(["systemctl", "--user", state, SERVICE_NAME])
 
     def _util_launchd_control_macos(self, state: Literal["start", "stop", "restart"]):
@@ -81,11 +84,14 @@ class SystemService(BaseService):
             if state == "stop":
                 # stop the service. since KeepAlive is true in plist, it will be restarted by launchd automatically!
                 # if the user wants to stop it permanently, they should uninstall the service.
+                sse_service.dispatch_event(SseEventTranslateableFrontendNotification(color="positive", message_key="system.service_stopped"))
                 subprocess.run(["launchctl", "kill", "SIGTERM", service_target], check=True)
             elif state == "start":
+                sse_service.dispatch_event(SseEventTranslateableFrontendNotification(color="positive", message_key="system.service_started"))
                 subprocess.run(["launchctl", "kickstart", service_target], check=True)
             elif state == "restart":
                 # -k: kill the running instance before restarting
+                sse_service.dispatch_event(SseEventTranslateableFrontendNotification(color="positive", message_key="system.service_restarted"))
                 subprocess.run(["launchctl", "kickstart", "-k", service_target], check=True)
         except Exception as exc:
             logger.error(f"error executing {state} on {service_target}: {exc}")
@@ -127,6 +133,7 @@ class SystemService(BaseService):
         try:
             subprocess.run("systemctl --user enable photobooth-app.service", shell=True)
             logger.info("service enabled")
+            sse_service.dispatch_event(SseEventTranslateableFrontendNotification(color="positive", message_key="system.service_installed"))
         except Exception as exc:
             raise RuntimeError("error enable the service") from exc
 
@@ -161,6 +168,7 @@ class SystemService(BaseService):
             # -w overrides the Disabled key and sets it to false (enabling the service)
             subprocess.run(["launchctl", "load", "-w", str(PHOTOBOOTH_APP_PLIST_FILE)], check=True)
             logger.info("service enabled and loaded")
+            sse_service.dispatch_event(SseEventTranslateableFrontendNotification(color="positive", message_key="system.service_installed"))
         except Exception as exc:
             raise RuntimeError("error enable the service") from exc
 
@@ -182,6 +190,7 @@ class SystemService(BaseService):
 
         try:
             os.remove(PHOTOBOOTH_APP_SERVICE_FILE)
+            sse_service.dispatch_event(SseEventTranslateableFrontendNotification(color="positive", message_key="system.service_uninstalled"))
         except Exception as exc:
             raise RuntimeError("could not delete service file") from exc
 
@@ -197,6 +206,7 @@ class SystemService(BaseService):
 
         try:
             os.remove(PHOTOBOOTH_APP_PLIST_FILE)
+            sse_service.dispatch_event(SseEventTranslateableFrontendNotification(color="positive", message_key="system.service_uninstalled"))
         except Exception as exc:
             raise RuntimeError("could not delete service file") from exc
 

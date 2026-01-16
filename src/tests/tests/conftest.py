@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 from gpiozero import Device
 from gpiozero.pins.mock import MockFactory
 
-from photobooth.appconfig import appconfig
+from photobooth.appconfig import AppConfig, appconfig
 from photobooth.application import app
 from photobooth.container import container
 from photobooth.database.database import create_db_and_tables
@@ -54,6 +54,22 @@ def global_function_setup1():
 @pytest.fixture(scope="function", autouse=True)
 def global_function_setup2():
     appconfig.reset_defaults()
+    defaults = AppConfig().actions
+    if not defaults.animation:
+        from photobooth.services.config.groups.actions import GroupActions
+
+        defaults = GroupActions()
+
+    if not appconfig.actions.image:
+        appconfig.actions.image = defaults.image
+    if not appconfig.actions.collage:
+        appconfig.actions.collage = defaults.collage
+    if not appconfig.actions.animation:
+        appconfig.actions.animation = defaults.animation
+    if not appconfig.actions.video:
+        appconfig.actions.video = defaults.video
+    if not appconfig.actions.multicamera:
+        appconfig.actions.multicamera = defaults.multicamera
 
     appconfig.actions.image[0].jobcontrol.countdown_capture = 0.2
     appconfig.actions.collage[0].jobcontrol.countdown_capture = 0.2

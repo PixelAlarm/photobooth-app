@@ -1,12 +1,15 @@
 import logging
 import time
 from collections.abc import Generator
+from pathlib import Path
 
 import pytest
 from PIL import Image
 
 from photobooth.appconfig import appconfig
 from photobooth.container import Container, container
+from photobooth.services.config.models.frameoverlay import FrameOverlay
+from photobooth.utils.exceptions import MissingFilesError
 
 from ..util import block_until_device_is_running, video_duration
 
@@ -225,3 +228,17 @@ def test_multicamera(_container: Container):
     else:
         with Image.open(phase2_item.processed, formats=["GIF", "AVIF", "WEBP"]) as img:
             img.verify()
+
+
+def test_action_with_missing_file_refused_others_work(_container: Container, tmp_path: Path):
+    appconfig.actions.image[0].processing.img_frame = FrameOverlay(enable=True, image=tmp_path / "gone.png")
+
+    with pytest.raises(MissingFilesError, match="gone.png"):
+        _container.processing_service.trigger_action("image", 0)
+    assert _container.processing_service._workflow_jobmodel is None
+
+    appconfig.actions.collage[0].jobcontrol.ask_approval_each_capture = False
+    _container.processing_service.trigger_action("collage", 0)
+    _container.processing_service.wait_until_job_finished()
+
+    assert _container.processing_service._workflow_jobmodel is None

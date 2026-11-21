@@ -11,11 +11,12 @@ from statemachine import Event, State
 from ..appconfig import appconfig
 from ..database.models import Mediaitem
 from ..plugins import pm as pluggy_pm
-from ..utils.exceptions import ProcessMachineOccupiedError
+from ..utils.exceptions import MissingFilesError, ProcessMachineOccupiedError
 from .acquisition import AcquisitionService
 from .base import BaseService
 from .collection import MediacollectionService
 from .config.groups.actions import MultiImageJobControl
+from .config.missingfiles import find_all_missing_files, find_missing_files
 from .information import InformationService
 from .processor.animation import JobModelAnimation
 from .processor.base import JobModelBase
@@ -131,6 +132,12 @@ class ProcessingService(BaseService):
 
     def start(self):
         super().start()
+
+        if missing := find_all_missing_files(appconfig.actions):
+            logger.warning(
+                f"config refers to missing files, affected actions refuse to start until fixed: {', '.join(str(m['path']) for m in missing)}"
+            )
+
         super().started()
 
     def stop(self):
@@ -216,8 +223,12 @@ class ProcessingService(BaseService):
         ## preflight checks
         self._check_occupied()
 
+        configuration_set = getattr(appconfig.actions, action_type)[action_index]
+        if missing := find_missing_files(configuration_set.processing):
+            raise MissingFilesError(f"missing files: {', '.join(str(p) for p in missing)}")
+
         jobmodel = ACTION_TO_MODEL[action_type](
-            configuration_set=getattr(appconfig.actions, action_type)[action_index],
+            configuration_set=configuration_set,
             acquisition_service=self._acquisition_service,
         )
 

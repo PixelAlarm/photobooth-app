@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 
 from photobooth.container import container
 from photobooth.services.processing import ProcessingService
-from photobooth.utils.exceptions import ProcessMachineOccupiedError
+from photobooth.utils.exceptions import MissingFilesError, ProcessMachineOccupiedError
 
 logger = logging.getLogger(name=None)
 
@@ -72,3 +72,13 @@ def test_chose_multicamera(client: TestClient):
         assert response.status_code == 200
 
         mock.assert_called()
+
+
+def test_chose_1pic_missing_files(client: TestClient):
+    error_mock = mock.MagicMock()
+    error_mock.side_effect = MissingFilesError("missing files: userdata/gone.png")
+
+    with patch.object(ProcessingService, "trigger_action", error_mock):
+        response = client.get("/actions/image/0")
+        assert response.status_code == 409
+        assert "userdata/gone.png" in response.json()["detail"]

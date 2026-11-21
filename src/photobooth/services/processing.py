@@ -225,7 +225,14 @@ class ProcessingService(BaseService):
 
         configuration_set = getattr(appconfig.actions, action_type)[action_index]
         if missing := find_missing_files(configuration_set.processing):
-            raise MissingFilesError(f"missing files: {', '.join(str(p) for p in missing)}")
+            sse_service.dispatch_event(
+                SseEventTranslateableFrontendNotification(
+                    color="negative",
+                    message_key="processing.missing_files",
+                    context_data={"files": ", ".join(f"{path.name} ({field})" for field, path in missing)},
+                )
+            )
+            raise MissingFilesError(f"missing files: {', '.join(f'{path} ({field})' for field, path in missing)}")
 
         jobmodel = ACTION_TO_MODEL[action_type](
             configuration_set=configuration_set,

@@ -2,6 +2,7 @@ import logging
 import time
 from collections.abc import Generator
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 from PIL import Image
@@ -233,8 +234,13 @@ def test_multicamera(_container: Container):
 def test_action_with_missing_file_refused_others_work(_container: Container, tmp_path: Path):
     appconfig.actions.image[0].processing.img_frame = FrameOverlay(enable=True, image=tmp_path / "gone.png")
 
-    with pytest.raises(MissingFilesError, match="gone.png"):
-        _container.processing_service.trigger_action("image", 0)
+    with patch("photobooth.services.processing.sse_service.dispatch_event") as dispatch:
+        with pytest.raises(MissingFilesError, match="gone.png"):
+            _container.processing_service.trigger_action("image", 0)
+        event = dispatch.call_args.args[0]
+        assert event.color == "negative"
+        assert event.message_key == "processing.missing_files"
+        assert event.context_data == {"files": "gone.png (img_frame.image)"}
     assert _container.processing_service._workflow_jobmodel is None
 
     appconfig.actions.collage[0].jobcontrol.ask_approval_each_capture = False

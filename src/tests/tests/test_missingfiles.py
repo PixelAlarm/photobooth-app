@@ -17,7 +17,7 @@ def test_config_loads_with_missing_file_and_reports_it(tmp_path: Path):
     missing = tmp_path / "gone.png"
     processing = SingleImageProcessing(img_frame=FrameOverlay(enable=True, image=missing))
 
-    assert find_missing_files(processing) == [missing]
+    assert find_missing_files(processing) == [("img_frame.image", missing)]
 
 
 def test_existing_file_not_reported(tmp_path: Path):
@@ -36,7 +36,7 @@ def test_disabled_step_is_ignored(tmp_path: Path):
 def test_collage_predefined_image(tmp_path: Path):
     processing = CollageProcessing(merge_definition=[CollageMergeDefinition(predefined_image=tmp_path / "gone.png")])
 
-    assert find_missing_files(processing) == [tmp_path / "gone.png"]
+    assert find_missing_files(processing) == [("merge_definition.predefined_image", tmp_path / "gone.png")]
 
 
 def test_appconfig_loads_with_missing_file(tmp_path: Path):
@@ -45,7 +45,7 @@ def test_appconfig_loads_with_missing_file(tmp_path: Path):
 
     config = AppConfig.model_validate(data)
 
-    assert {"action": "image", "index": 0, "path": str(tmp_path / "gone.png")} in find_all_missing_files(config.actions)
+    assert {"action": "image", "index": 0, "field": "img_frame.image", "path": str(tmp_path / "gone.png")} in find_all_missing_files(config.actions)
 
 
 def test_startup_logs_missing_files(tmp_path: Path, caplog: pytest.LogCaptureFixture):
